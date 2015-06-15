@@ -235,3 +235,18 @@ td:target {
 .group {
   text-align: center;
 }
+
+/* hide or fade out pager arrows when the first or last row is visible */
+.pager img.disabled {
+  /* visibility: hidden */
+  opacity: 0.5;
+  filter: alpha(opacity=50);
+}
+.pager {
+  border-width: 2px !important;
+  border-color: rgb(185, 202, 213) !important;
+  padding-left: 20px !important;
+/*  border-radius: 5px 5px 0 0 !important; */
+  border-style: solid !important;
+}
+}

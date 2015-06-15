@@ -1,97 +1,122 @@
 {% extends "parent_display.html" %}
 {% block content %}
-  <h1 class="centered">
-		Search Results
-		{% with question_title='Search Results'%}
-      {% with question_text='Use the tabs below to filter your search results to a particular category. The results can also be sorted by clicking a heading at the top of each table.'%}
+  <!-- tablesorter code -->
+    <h1 class="centered">
+        Search Results
+        {% with question_title='Search Results'%}
+        {% with question_text='Use the tabs below to filter your search results to a particular category. The results can also be sorted by clicking a heading at the top of each table.'%}
         {% include 'question_mark.html' %}
-      {% endwith %}
-    {% endwith %}
-	</h1>
+        {% endwith %}
+        {% endwith %}
+    </h1>
 
   <div class="tabbable" style="margin-bottom:50px;">
-	<ul class="nav nav-tabs list-display-tabs">
+    <!-- <ul class="nav nav-tabs list-display-tabs">
       <li class="active"><a href="#tab_all_results" data-toggle="tab">All Results</a></li>
       <li><a href="#tab_models" data-toggle="tab">Models</a></li>
       <li><a href="#tab_reactions" data-toggle="tab">Reactions</a></li>
       <li><a href="#tab_metabolites" data-toggle="tab">Metabolites</a></li>
       <li><a href="#tab_genes" data-toggle="tab">Genes</a></li>
-	</ul>
-	
-	<div class="tab-content">
-	  
-	  {% for location in ['summary_tab', 'individual_tabs'] %}
+    </ul>
+     -->
+    <div class="tab-content">
+      
+      {% for location in ['summary'] %} <!-- , 'individual'] %} -->
 
-	    <!-- Summary tab header -->
-	    {% if location == 'summary_tab' %}
-		  <div class="tab-pane active" id="tab_all_results">
-		    {% if (not results['models'] and not results['reactions'] and
+        <!-- Summary tab header -->
+        {% if location == 'summary' %}
+          <div class="tab-pane active" id="tab_all_results">
+            {% if (not results['models'] and not results['reactions'] and
               not results['metabolites'] and not results['genes']) %}
-		      <h3 class="centered section-label">No results</h3>
-		    {% endif %}
-	    {% endif %}
+              <h3 class="centered section-label">No results</h3>
+            {% endif %}
+        {% endif %}
 
-	    {% for type in ['models', 'reactions', 'metabolites', 'genes'] %}
+        {% for type in ['models', 'reactions', 'metabolites', 'genes'] %}
 
-		  <!-- Individual tab header -->
-		  {% if location == 'individual_tabs' %}
-		    <div class="tab-pane" id="tab_{{type}}">
-		      {% if not results[type] %}
-		        <h3 class="centered section-label">No {{type}} found</h3>
-		      {% endif %}
-		  {% endif %}
+          <!-- Individual tab header -->
+          {% if location == 'individual' %}
+            <div class="tab-pane" id="tab_{{type}}">
+              {% if not results[type] %}
+                <h3 class="centered section-label">No {{type}} found</h3>
+              {% endif %}
+          {% endif %}
 
-		  {% if results[type] %}
-		    <h3 class="centered section-label">{{type|capitalize()}}</h3>
+          {% if results[type] %}
+            <h3 class="centered section-label">{{type|capitalize()}}</h3>
 
-		    {% if type == 'models' %}
-		      <table class="myTable tablesorter">
-		        <thead>
-			      <tr>
-			        <th>BiGG ID</th>
-			        <th>Organism</th>
-			        <th>Metabolites</th>
-			        <th>Reactions</th>
-			        <th>Genes</th>
-			      </tr>
-		        </thead>
-		        <tbody>
-			      {% for values in results[type] %}
-			        <tr class ='rowlink'>  
-			          <td><a href="/models/{{values['bigg_id']}}">{{values['bigg_id']}}</a></td>
-			          <td>{% if values['organism'] is none %}-{% else %}{{values['organism']}}{% endif %}</td>
-			          <td><a href="/models/{{values['bigg_id']}}/metabolites">{{values['metabolite_count']}}</a></td>
-			          <td><a href="/models/{{values['bigg_id']}}/reactions">{{values['reaction_count']}}</a></td>
-			          <td><a href="/models/{{values['bigg_id']}}/genes">{{values['gene_count']}}</a></td>
-			        </tr>
-			      {% endfor %}
-		        </tbody>
-		      </table>
+            {% if type == 'models' %}
+              <table class="{{location}}-{{type}}-tablesorter tablesorter">
+                <thead>
+                    
+                  <tr>
+                    <td class="pager sorter-false" colspan="4">
+                        <img src="/static/lib/tablesorter/addons/pager/icons/first.png" class="first"/>
+                        <img src="/static/lib/tablesorter/addons/pager/icons/prev.png" class="prev"/>
+                        <span class="pagedisplay"></span> <!-- this can be any element, including an input -->
+                        <img src="/static/lib/tablesorter/addons/pager/icons/next.png" class="next"/>
+                        <img src="/static/lib/tablesorter/addons/pager/icons/last.png" class="last"/>
+                    </td>
+                  </tr>
+                 
+                  <tr>
+                    <th>BiGG ID</th>
+                    <th>Organism</th>
+                    <th class="sorter-false">Metabolites</th>
+                    <th class="sorter-false">Reactions</th>
+                    <th class="sorter-false">Genes</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {% for values in results[type] %}
+                    <tr class ='rowlink'>  
+                      <td><a href="/models/{{values['bigg_id']}}">{{values['bigg_id']}}</a></td>
+                      <td>{% if values['organism'] is none %}-{% else %}{{values['organism']}}{% endif %}</td>
+                      <td><a href="/models/{{values['bigg_id']}}/metabolites">{{values['metabolite_count']}}</a></td>
+                      <td><a href="/models/{{values['bigg_id']}}/reactions">{{values['reaction_count']}}</a></td>
+                      <td><a href="/models/{{values['bigg_id']}}/genes">{{values['gene_count']}}</a></td>
+                    </tr>
+                  {% endfor %}
+                </tbody>
+              </table>
 
-            {% else %}
-		      <table class="myTable tablesorter">
-		        <thead>
-			      <tr>
-			        <th>BiGG ID</th>
-			        <th>Descriptive name</th>
-			        <th>Model</th>
-			        <th>Organism</th>
-		        </thead>
-		        <tbody>
-			      {% for values in results[type] %}
-			        <tr class ='rowlink'>  
+              {% else %}
+              <table class="{{location}}-{{type}}-tablesorter tablesorter">
+                <thead>
+                    
+                    <tr>
+                        <td class="pager sorter-false" colspan="4">
+                            <img src="/static/lib/tablesorter/addons/pager/icons/first.png" class="first"/>
+                            <img src="/static/lib/tablesorter/addons/pager/icons/prev.png" class="prev"/>
+                            <span class="pagedisplay"></span> <!-- this can be any element, including an input -->
+                            <img src="/static/lib/tablesorter/addons/pager/icons/next.png" class="next"/>
+                            <img src="/static/lib/tablesorter/addons/pager/icons/last.png" class="last"/>
+                        </td>
+                    </tr>
+                    
+                    <tr>
+                        <th>BiGG ID</th> <!-- thead text will be updated from the JSON; make sure the number of columns matches the JSON data -->
+                        <th>Descriptive Name </th>
+                        <th class="sorter-false">Model</th>
+                        <th class="sorter-false">Organism</th>
+                    </tr>
+                </thead>
+                <tbody>
+                {% if no_pager == true%}
+{% for values in results[type] %}
+                    <tr class ='rowlink'>  
                       <td>
                         {% if type == 'metabolites' and 'compartment_bigg_id' not in values %}
-			              <a href="/models/universal/{{type}}/{{values['bigg_id']}}">{{values['bigg_id']}}</a>
+                          <a href="/models/universal/{{type}}/{{values['bigg_id']}}">{{values['bigg_id']}}</a>
                         {% elif type == 'metabolites' %}
-			              <a href="/models/{{values['model_bigg_id']}}/{{type}}/{{values['bigg_id']}}_{{values['compartment_bigg_id']}}">
+                          <a href="/models/{{values['model_bigg_id']}}/{{type}}/{{values['bigg_id']}}_{{values['compartment_bigg_id']}}">
                             {{values['bigg_id']}}_{{values['compartment_bigg_id']}}
                           </a>
                         {% else %}
-			              <a href="/models/{{values['model_bigg_id']}}/{{type}}/{{values['bigg_id']}}">{{values['bigg_id']}}</a>
+                          <a href="/models/{{values['model_bigg_id']}}/{{type}}/{{values['bigg_id']}}">{{values['bigg_id']}}</a>
                         {% endif %}
                       </td>
-					  <td>{% if values['name'] is not none %}{{values['name']}}{% endif %}</td>
+                      <td>{% if values['name'] is not none %}{{values['name']}}{% endif %}</td>
                       <td>
                         {% if values['model_bigg_id'] == 'universal' %}
                           Universal
@@ -106,26 +131,69 @@
                           {{values['organism']}}
                         {% endif %}
                       </td>
-			        </tr>
-			      {% endfor %}
-		        </tbody>
-		      </table>
-		    {% endif %}
-		  {% endif %}
+                    </tr>
+                  {% endfor %}
+                  {% endif %}
+                </tbody>
+              </table>
+            <!--
+              <table class="myTable tablesorter">
+                <thead>
+                  <tr>
+                    <th>BiGG ID</th>
+                    <th>Descriptive name</th>
+                    <th>Model</th>
+                    <th>Organism</th>
+                </thead>
+                <tbody>
+                  {% for values in results[type] %}
+                    <tr class ='rowlink'>  
+                      <td>
+                        {% if type == 'metabolites' and 'compartment_bigg_id' not in values %}
+                          <a href="/models/universal/{{type}}/{{values['bigg_id']}}">{{values['bigg_id']}}</a>
+                        {% elif type == 'metabolites' %}
+                          <a href="/models/{{values['model_bigg_id']}}/{{type}}/{{values['bigg_id']}}_{{values['compartment_bigg_id']}}">
+                            {{values['bigg_id']}}_{{values['compartment_bigg_id']}}
+                          </a>
+                        {% else %}
+                          <a href="/models/{{values['model_bigg_id']}}/{{type}}/{{values['bigg_id']}}">{{values['bigg_id']}}</a>
+                        {% endif %}
+                      </td>
+                      <td>{% if values['name'] is not none %}{{values['name']}}{% endif %}</td>
+                      <td>
+                        {% if values['model_bigg_id'] == 'universal' %}
+                          Universal
+                        {% else %}
+                          {{values['model_bigg_id']}}
+                        {% endif %}
+                      </td>
+                      <td>
+                        {% if values['model_bigg_id'] == 'universal' or values['organism'] is none %}
+                          <center>-</center>
+                        {% else %}
+                          {{values['organism']}}
+                        {% endif %}
+                      </td>
+                    </tr>
+                  {% endfor %}
+                </tbody>
+              </table>-->
+            {% endif %}
+          {% endif %}
 
-		  <!-- Individual tab footer -->
-		  {% if location == 'individual_tabs' %}
-		    </div>
-		  {% endif %}
-	    {% endfor %}
+          <!-- Individual tab footer -->
+          {% if location == 'individual' %}
+            </div>
+          {% endif %}
+        {% endfor %}
 
-	    <!-- Summary tab footer -->
-	    {% if location == 'summary_tab' %}
-		  </div>
-	    {% endif %}
-	  {% endfor %}
+        <!-- Summary tab footer -->
+        {% if location == 'summary' %}
+          </div>
+        {% endif %}
+      {% endfor %}
 
-	</div>
+    </div>
   </div>
 
-{% endblock %}	
+{% endblock %}  

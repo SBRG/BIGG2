@@ -170,10 +170,45 @@ class MainHandler(BaseHandler):
 # reactions
 class UniversalReactionListHandler(BaseHandler):
     def get(self):
+        #column_names = {'0': 'reaction.bigg_id', '1': 'reaction.name', 
+        #                '2': 'model.bigg_id', '3': 'genome.organism'}
+
+        # get arguments
+        page = self.get_argument('page', None)
+        size = self.get_argument('size', None)
+
+        # get the sorting column
+        sort_col_index = 0
+        sort_direction = 'ascending'
+        for k, v in self.request.query_arguments.iteritems():
+            # k = 'col[1]'
+            split = [x.strip('[]') for x in k.split('[')] 
+            # split = ['col', '1']
+            if len(split) != 2:
+                continue
+            if split[0] == 'col':
+                sort_col_index = int(split[1])
+                sort_direction = ('ascending' if v[0] == '0' else 'descending')
+
+        # run the queries
         session = Session()
-        universal_reactions = [{'bigg_id': x[0], 'name': x[1]}
-                               for x in session.query(Reaction.bigg_id, Reaction.name).all()]
-        data = json.dumps(sorted(universal_reactions, key=lambda r: r['bigg_id'].lower()))
+        if page is None or size is None:
+            result = queries.get_universal_reactions(session)
+        else:
+            raw_results = queries.get_universal_reactions_pager(page, size, sort_col_index, 
+                                                                sort_direction, session)
+            table_results = [{'BiGG': '<a href ="/universal/reactions/{0}">{0}</a>'.format(x['bigg_id']),
+                              'Name': x['name'], 'Model': 'Universal', 'Organism': '-'}
+                              for x in raw_results]
+            result = {'rows': table_results,
+                      'total_rows': queries.get_universal_reactions_count(session),
+                      'headers': ['BiGG', 'Name', 'Model', 'Organism']}
+
+#        if page and int(page) > 0:
+ #           import ipdb; ipdb.set_trace()
+
+        # write out the JSON
+        data = json.dumps(result)
         self.write(data)
         self.set_header('Content-type', 'application/json')
         self.finish()
@@ -238,12 +273,43 @@ class UniversalReactionDisplayHandler(BaseHandler):
 
 class UniversalMetaboliteListHandler(BaseHandler):
     def get(self):
-        session = Session()
+        """session = Session()
         metabolites = [{'bigg_id': x[0], 'name': x[1]}
                        for x in session.query(Metabolite.bigg_id, Metabolite.name).all()]
-        data = json.dumps(sorted(metabolites, key=lambda m: m['bigg_id'].lower()))
-        session.close()
+        data = json.dumps(sorted(metabolites, key=lambda m: m['bigg_id'].lower()))"""
 
+        page = self.get_argument('page', None)
+        size = self.get_argument('size', None)
+
+        # get the sorting column
+        sort_col_index = 0
+        sort_direction = 'ascending'
+        for k, v in self.request.query_arguments.iteritems():
+            # k = 'col[1]'
+            split = [x.strip('[]') for x in k.split('[')] 
+            # split = ['col', '1']
+            if len(split) != 2:
+                continue
+            if split[0] == 'col':
+                sort_col_index = int(split[1])
+                sort_direction = ('ascending' if v[0] == '0' else 'descending')
+
+        # run the queries
+        session = Session()
+        if page is None or size is None:
+            result = queries.get_universal_metabolites(session)
+        else:
+            raw_results = queries.get_universal_metabolites_pager(page, size, sort_col_index, 
+                                                                sort_direction, session)
+            table_results = [{'BiGG': '<a href ="/universal/metabolites/{0}">{0}</a>'.format(x['bigg_id']),
+                              'Name': x['name'], 'Model': 'Universal', 'Organism': '-'}
+                              for x in raw_results]
+            result = {'rows': table_results,
+                      'total_rows': queries.get_universal_metabolites_count(session),
+                      'headers': ['BiGG', 'Name', 'Model', 'Organism']}
+        
+        session.close()
+        data = json.dumps(result)
         self.write(data)
         self.set_header('Content-type', 'application/json')
         self.finish()
@@ -303,11 +369,42 @@ class UniversalMetaboliteDisplayHandler(BaseHandler):
 
 class ReactionListHandler(BaseHandler):
     def get(self, model_bigg_id):
-        session = Session()
-        result = queries.get_reactions_for_model(model_bigg_id, session)
-        sorted(result, key=lambda r: r['bigg_id'].lower())
-        session.close()
+                #column_names = {'0': 'reaction.bigg_id', '1': 'reaction.name', 
+        #                '2': 'model.bigg_id', '3': 'genome.organism'}
 
+        # get arguments
+        page = self.get_argument('page', None)
+        size = self.get_argument('size', None)
+
+        # get the sorting column
+        sort_col_index = 0
+        sort_direction = 'ascending'
+        for k, v in self.request.query_arguments.iteritems():
+            # k = 'col[1]'
+            split = [x.strip('[]') for x in k.split('[')] 
+            # split = ['col', '1']
+            if len(split) != 2:
+                continue
+            if split[0] == 'col':
+                sort_col_index = int(split[1])
+                sort_direction = ('ascending' if v[0] == '0' else 'descending')
+
+        # run the queries
+        session = Session()
+        if page is None or size is None:
+            result = queries.get_reactions_for_model(model_bigg_id, session)
+            sorted(result, key=lambda r: r['bigg_id'].lower())
+        else:
+            raw_results = queries.get_reactions_pager(page, size, sort_col_index, 
+                                                                sort_direction,  model_bigg_id, session)
+            table_results = [{'BiGG': '<a href ="/models/{0}/reactions/{1}">{1}</a>'.format(x['model_bigg_id'], x['bigg_id']),
+                              'Name': x['name'], 'Model': x['model_bigg_id'], 'Organism': x['organism']}
+                              for x in raw_results]
+            result = {'rows': table_results,
+                      'total_rows': queries.get_reactions_count(model_bigg_id, session),
+                      'headers': ['BiGG', 'Name', 'Model', 'Organism']}
+        
+        session.close()
         self.write(json.dumps(result))
         self.set_header('Content-type', 'json')
         self.finish()   
@@ -511,11 +608,38 @@ class GenomeDisplayHandler(BaseHandler):
 # Models
 class ModelListHandler(BaseHandler):    
     def get(self):
-        session = Session()
-        model_list = queries.get_model_list_and_counts(session)
-        session.close()
+        page = self.get_argument('page', None)
+        size = self.get_argument('size', None)
 
-        data = json.dumps(model_list)
+        # get the sorting column
+        sort_col_index = 0
+        sort_direction = 'ascending'
+        for k, v in self.request.query_arguments.iteritems():
+            # k = 'col[1]'
+            split = [x.strip('[]') for x in k.split('[')] 
+            # split = ['col', '1']
+            if len(split) != 2:
+                continue
+            if split[0] == 'col':
+                sort_col_index = int(split[1])
+                sort_direction = ('ascending' if v[0] == '0' else 'descending')
+
+        # run the queries
+        session = Session()
+        if page is None or size is None:
+            result = queries.get_model_list_and_counts(session)
+            sorted(result, key=lambda r: r['bigg_id'].lower())
+        else:
+            raw_results = queries.get_models_pager(page, size, sort_col_index, 
+                                                                sort_direction, session)
+            table_results = [{'BiGG': '<a href ="/models/{0}">{0}</a>'.format(x['bigg_id']),
+                              'Organism': x['organism'], 'Metabolites': '<a href="/models/{0}/metabolites">{1}</a>'.format(x['bigg_id'],x['metabolite_count']), 'Reactions': '<a href="/models/{0}/reactions">{1}</a>'.format(x['bigg_id'], x['reaction_count']), 'Genes': '<a href="/models/{0}/genes">{1}</a>'.format(x['bigg_id'], x['gene_count'])}
+                              for x in raw_results]
+            result = {'rows': table_results,
+                      'total_rows': queries.get_models_count(session),
+                      'headers': ['BiGG', 'Organism', 'Metabolites', 'Reactions', 'Genes']}
+        session.close()
+        data = json.dumps(result)
         self.write(data)
         self.set_header('Content-type', 'application/json')
         self.finish()
@@ -583,11 +707,38 @@ class ModelDisplayHandler(BaseHandler):
 
 class MetaboliteListHandler(BaseHandler):
     def get(self, model_bigg_id):
+        page = self.get_argument('page', None)
+        size = self.get_argument('size', None)
+
+        # get the sorting column
+        sort_col_index = 0
+        sort_direction = 'ascending'
+        for k, v in self.request.query_arguments.iteritems():
+            # k = 'col[1]'
+            split = [x.strip('[]') for x in k.split('[')] 
+            # split = ['col', '1']
+            if len(split) != 2:
+                continue
+            if split[0] == 'col':
+                sort_col_index = int(split[1])
+                sort_direction = ('ascending' if v[0] == '0' else 'descending')
+
+        # run the queries
         session = Session()
-        metaboliteList = queries.get_metabolites_for_model(model_bigg_id, session)
+        if page is None or size is None:
+            result = queries.get_metabolites_for_model(model_bigg_id, session)
+            sorted(result, key=lambda r: r['bigg_id'].lower())
+        else:
+            raw_results = queries.get_metabolites_pager(page, size, sort_col_index, 
+                                                                sort_direction,  model_bigg_id, session)
+            table_results = [{'BiGG': '<a href ="/models/{0}/metabolites/{1}_{2}">{1}_{2}</a>'.format(x['model_bigg_id'], x['bigg_id'], x['compartment']),
+                              'Name': x['name'], 'Model': x['model_bigg_id'], 'Organism': x['organism']}
+                              for x in raw_results]
+            result = {'rows': table_results,
+                      'total_rows': queries.get_metabolites_count(model_bigg_id, session),
+                      'headers': ['BiGG', 'Name', 'Model', 'Organism']}
         session.close()
-        
-        data = json.dumps(sorted(metaboliteList, key=lambda m: m['bigg_id'].lower()))
+        data = json.dumps(result)
         self.write(data)
         self.set_header('Content-type', 'application/json')
         self.finish()
@@ -620,7 +771,6 @@ class MetaboliteHandler(BaseHandler):
         results = queries.get_model_comp_metabolite(met_bigg_id, compartment_bigg_id,
                                                     model_bigg_id, session)
         session.close()
-
         data = json.dumps(results)
         self.write(data)
         self.set_header('Content-type', 'application/json')
@@ -651,11 +801,38 @@ class MetaboliteDisplayHandler(BaseHandler):
 
 class GeneListHandler(BaseHandler):
     def get(self, model_bigg_id):
-        session = Session()
-        results = queries.get_gene_list_for_model(model_bigg_id, session)
-        session.close()
+        page = self.get_argument('page', None)
+        size = self.get_argument('size', None)
 
-        data = json.dumps(sorted(results, key=lambda s: s['bigg_id'].lower()))
+        # get the sorting column
+        sort_col_index = 0
+        sort_direction = 'ascending'
+        for k, v in self.request.query_arguments.iteritems():
+            # k = 'col[1]'
+            split = [x.strip('[]') for x in k.split('[')] 
+            # split = ['col', '1']
+            if len(split) != 2:
+                continue
+            if split[0] == 'col':
+                sort_col_index = int(split[1])
+                sort_direction = ('ascending' if v[0] == '0' else 'descending')
+
+        # run the queries
+        session = Session()
+        if page is None or size is None:
+            result = queries.get_gene_list_for_model(model_bigg_id, session)
+            sorted(result, key=lambda s: s['bigg_id'].lower())
+        else:
+            raw_results = queries.get_genes_pager(page, size, sort_col_index, 
+                                                                sort_direction,  model_bigg_id, session)
+            table_results = [{'BiGG': '<a href ="/models/{0}/genes/{1}">{1}</a>'.format(x['model_bigg_id'], x['bigg_id']),
+                              'Name': x['name'], 'Model': x['model_bigg_id'], 'Organism': x['organism']}
+                              for x in raw_results]
+            result = {'rows': table_results,
+                      'total_rows': queries.get_genes_count(model_bigg_id, session),
+                      'headers': ['BiGG', 'Name', 'Model', 'Organism']}
+        session.close()
+        data = json.dumps(result)
         self.write(data)
         self.set_header('Content-type', 'application/json')
         self.finish()
@@ -719,31 +896,106 @@ class GeneDisplayHandler(BaseHandler):
 class SearchHandler(BaseHandler):
     def get(self):
         query_string = self.get_argument("query")
+        page = self.get_argument('page', None)
+        size = self.get_argument('size', None)
+        searchType = self.get_argument('cPage', None)
+        sort_col_index = 0
+        sort_direction = 'ascending'
+        for k, v in self.request.query_arguments.iteritems():
+            # k = 'col[1]'
+            split = [x.strip('[]') for x in k.split('[')] 
+            # split = ['col', '1']
+            if len(split) != 2:
+                continue
+            if split[0] == 'col':
+                sort_col_index = int(split[1])
+                sort_direction = ('ascending' if v[0] == '0' else 'descending')
 
-        session = Session()
-        # genes
-        gene_list = queries.search_for_genes(query_string, session)
-        
-        # reactions
-         
-        reaction_list = queries.search_for_universal_reactions(query_string,
-                                                               session)
-        # metabolites
-        metabolite_list = []
-        metabolite_list += queries.search_for_universal_metabolites(query_string,
-                                                                    session)
-        metabolite_list += queries.search_for_metabolites(query_string, session,
-                                                          strict=True)
-        # models
-        
-        model_list = queries.search_for_models(query_string, session)
-        session.close()
-
-        dictionary = {"results": {"reactions": reaction_list, 
+        # run the queries
+        session = Session()      
+        if page is None or size is None or searchType is None:
+                    # genes
+            gene_list = queries.search_for_genes(query_string, session)
+            
+            # reactions
+             
+            reaction_list = queries.search_for_universal_reactions(query_string,
+                                                                   session)
+            # metabolites
+            metabolite_list = []
+            metabolite_list += queries.search_for_universal_metabolites(query_string,
+                                                                        session)
+            metabolite_list += queries.search_for_metabolites(query_string, session,
+                                                              strict=True)
+            # models
+            
+            model_list = queries.search_for_models(query_string, session)
+            result = {"results": {"reactions": reaction_list, 
                                   "metabolites": metabolite_list,
                                   "models": model_list,
                                   "genes": gene_list}}
-        self.write(json.dumps(dictionary)) 
+        else:
+             # genes
+            gene_list = queries.search_for_genes_pager(query_string, page, size, sort_col_index, sort_direction, session)
+            
+            # reactions
+             
+            reaction_list = queries.search_for_universal_reactions_pager(query_string,
+                                                                   page,
+                                                                   size,
+                                                                   sort_col_index, 
+                                                                   sort_direction,
+                                                                   session)
+            # metabolites
+            metabolite_list = []
+            metabolite_list += queries.search_for_universal_metabolites_pager(query_string,
+                                                                        page,
+                                                                        size,
+                                                                        sort_col_index,
+                                                                        sort_direction,
+                                                                        session)
+            metabolite_list += queries.search_for_metabolites_pager(query_string,
+                                                              page,
+                                                              size,
+                                                              sort_col_index,
+                                                              sort_direction,
+                                                              session,
+                                                              strict=True)
+        # models
+        
+            model_list = queries.search_for_models_pager(query_string, page, size, sort_col_index, sort_direction, session)
+            
+            if (searchType == 'reactions'):
+                table_results = [{'BiGG': '<a href ="/models/{0}/reactions/{1}">{1}</a>'.format(x['model_bigg_id'], x['bigg_id']),
+                                'Name': x['name'], 'Model': 'universal', 'Organism': '-'}
+                                for x in reaction_list]
+                result = {'rows': table_results,
+                         'total_rows': len(table_results),
+                         'headers': ['BiGG', 'Name', 'Model', 'Organism']}
+            elif (searchType == 'metabolites'):
+                table_results = [{'BiGG': '<a href ="/models/{0}/metabolites/{1}">{1}</a>'.format(x['model_bigg_id'], x['bigg_id']),
+                                'Name': x['name'], 'Model': x['model_bigg_id'], 'Organism': x['organism']}
+                                for x in metabolite_list]
+                result = {'rows': table_results,
+                         'total_rows': len(table_results),
+                         'headers': ['BiGG', 'Name', 'Model', 'Organism']}
+            elif (searchType == 'genes'):
+                table_results = [{'BiGG': '<a href ="/models/{0}/genes/{1}">{1}</a>'.format(x['model_bigg_id'], x['bigg_id']),
+                                'Name': x['name'], 'Model': x['model_bigg_id'], 'Organism': x['organism']}
+                                for x in gene_list]
+                result = {'rows': table_results,
+                         'total_rows': len(table_results),
+                         'headers': ['BiGG', 'Name', 'Model', 'Organism']}
+            elif (searchType == 'models'):
+                table_results = [{'BiGG': '<a href ="/models/{0}">{0}</a>'.format(x['bigg_id']),
+                                'Organism': x['organism'], 'Metabolites': '<a href="/models/{0}/metabolites">{1}</a>'.format(x['bigg_id'],x['metabolite_count']), 'Reactions': '<a href="/models/{0}/reactions">{1}</a>'.format(x['bigg_id'], x['reaction_count']), 'Genes': '<a href="/models/{0}/genes">{1}</a>'.format(x['bigg_id'], x['gene_count'])}
+                                for x in model_list]
+                result = {'rows': table_results,
+                         'total_rows': len(table_results),
+                         'headers': ['BiGG', 'Organism', 'Metabolites', 'Reactions', 'Genes']}
+        session.close()
+        data = json.dumps(result)
+        self.write(data) 
         self.set_header('Content-type', 'application/json')
         self.finish()
 
@@ -821,17 +1073,17 @@ class AdvancedSearchResultsHandler(BaseHandler):
         query_strings = [x.strip() for x in
                          self.get_argument('query', '').split(',')
                          if x != '']
-
+        # run the queries
+        session = Session()
         def checkbox_arg(name):
             return self.get_argument(name, None) == 'on'
 
-        session = Session()
+        
         all_models = queries.get_model_list(session)
         model_list = [m for m in all_models if checkbox_arg(m)]
         include_metabolites = checkbox_arg('include_metabolites')
         include_reactions = checkbox_arg('include_reactions')
         include_genes = checkbox_arg('include_genes')
-
         metabolite_results = []
         reaction_results = []
         gene_results = []
@@ -847,14 +1099,14 @@ class AdvancedSearchResultsHandler(BaseHandler):
             if include_metabolites:
                 metabolite_results += queries.search_for_metabolites(query_string, session,
                                                                      limit_models=model_list)
+        result = {'results': {'reactions': reaction_results, 
+                              'metabolites': metabolite_results, 
+                              'genes': gene_results},
+                  'no_pager': True}
+        
         session.close()
-
-        dictionary = {'results': {'reactions': reaction_results, 
-                                  'metabolites': metabolite_results, 
-                                  'genes': gene_results}}
-
         template = env.get_template("list_display.html")
-        self.write(template.render(dictionary)) 
+        self.write(template.render(result)) 
         self.set_header('Content-type','text/html')
         self.finish() 
 

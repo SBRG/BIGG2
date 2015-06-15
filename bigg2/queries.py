@@ -1,14 +1,16 @@
 from ome.models import *
 from ome.base import Publication, PublicationModel
 from ome.loading.model_loading import parse
-
+from tornado.options import options
+from tornado.escape import url_escape
 from sqlalchemy import func
-from sqlalchemy import desc, func, or_, and_
+from sqlalchemy import desc, asc, func, or_, and_
 from collections import defaultdict
 from os.path import abspath, dirname, join
 
 root_directory = abspath(dirname(__file__))
-
+api_host = 'bigg.ucsd.edu'
+api_v = 'v2'
 class NotFoundError(Exception):
     pass
 
@@ -21,6 +23,205 @@ def _shorten_name(name, l=100):
         return name
 
 # Reactions
+def get_universal_reactions(session):
+    result_db = (session
+                 .query(Reaction.bigg_id, Reaction.name)
+                 .all())
+    return [{'bigg_id': x[0], 'name': x[1]}
+             for x in sorted(result_db, key=lambda r: r[0].lower())]
+
+def get_universal_metabolites(session):
+    result_db = (session
+                .query(Metabolite.bigg_id, Metabolite.name)
+                .all())
+    return [{'bigg_id': x[0], 'name': x[1]} 
+            for x in sorted(result_db, key=lambda m: m[0].lower())]
+
+def get_universal_metabolites_count(session):
+    return session.query(Metabolite).count()
+
+def get_universal_metabolites_pager(page, size, sort_col_index, sort_direction, session):
+    page = int(page); size = int(size)
+    offset = page * size
+    if sort_direction == 'descending':
+        direction_fn = desc
+    elif sort_direction == 'ascending':
+        direction_fn = asc
+    else:
+        raise Exception('Bad sort direction %s' % sort_direction)
+
+    try:
+        sort_column = [Metabolite.bigg_id, Metabolite.name][sort_col_index]
+    except IndexError:
+        sort_column = Metabolite.bigg_id
+
+    print offset, size, sort_column, direction_fn
+    result_db = (session
+                 .query(Metabolite.bigg_id, Metabolite.name)
+                 .order_by(direction_fn(func.lower(sort_column)))
+                 .limit(size) 
+                 .offset(offset))
+
+    return [{'bigg_id': x[0], 'name': x[1]} for x in result_db]
+
+def get_universal_reactions_count(session):
+    return session.query(Reaction).count()
+
+def get_reactions_count(model_bigg_id, session):
+    return (session
+            .query(Reaction)
+            .join(ModelReaction, ModelReaction.reaction_id == Reaction.id)
+            .join(Model, Model.id == ModelReaction.model_id)
+            .filter(Model.bigg_id == model_bigg_id)
+            .count())
+
+def get_universal_reactions_pager(page, size, sort_col_index, sort_direction, session):
+    page = int(page); size = int(size)
+    offset = page * size
+    if sort_direction == 'descending':
+        direction_fn = desc
+    elif sort_direction == 'ascending':
+        direction_fn = asc
+    else:
+        raise Exception('Bad sort direction %s' % sort_direction)
+
+    try:
+        sort_column = [Reaction.bigg_id, Reaction.name][sort_col_index]
+    except IndexError:
+        sort_column = Reaction.bigg_id
+
+    print offset, size, sort_column, direction_fn
+    result_db = (session
+                 .query(Reaction.bigg_id, Reaction.name)
+                 .order_by(direction_fn(func.lower(sort_column)))
+                 .limit(size) 
+                 .offset(offset))
+
+    return [{'bigg_id': x[0], 'name': x[1]} for x in result_db]
+
+def get_models_count(session):
+    return session.query(Model).count()
+
+def get_models_pager(page, size, sort_col_index, sort_direction, session):
+    page = int(page); size = int(size)
+    offset = page * size
+    if sort_direction == 'descending':
+        direction_fn = desc
+    elif sort_direction == 'ascending':
+        direction_fn = asc
+    else:
+        raise Exception('Bad sort direction %s' % sort_direction)
+
+    try:
+        sort_column = [Model.bigg_id, Genome.organism, ModelCount.metabolite_count, ModelCount.reaction_count, ModelCount.gene_count][sort_col_index]
+    except IndexError:
+        sort_column = Model.bigg_id
+    result_db = (session
+                 .query(Model.bigg_id, Genome.organism, ModelCount.metabolite_count, ModelCount.reaction_count, ModelCount.gene_count)
+                 .join(ModelCount, ModelCount.model_id == Model.id)
+                 .outerjoin(Genome, Genome.id == Model.genome_id)
+                 .order_by(direction_fn(func.lower(sort_column)))
+                 .limit(size) 
+                 .offset(offset))
+    return [{'bigg_id': x[0], 'organism': x[1], 'metabolite_count': x[2], 'reaction_count': x[3], 'gene_count': x[4]} for x in result_db]
+
+def get_reactions_pager(page, size, sort_col_index, sort_direction, model_bigg_id, session):
+    page = int(page); size = int(size)
+    offset = page * size
+    if sort_direction == 'descending':
+        direction_fn = desc
+    elif sort_direction == 'ascending':
+        direction_fn = asc
+    else:
+        raise Exception('Bad sort direction %s' % sort_direction)
+
+    try:
+        sort_column = [Reaction.bigg_id, Reaction.name][sort_col_index]
+    except IndexError:
+        sort_column = Reaction.bigg_id
+
+    print offset, size, sort_column, direction_fn
+    result_db = (session
+                 .query(Reaction.bigg_id, Reaction.name, Model.bigg_id, Genome.organism)
+                 .join(ModelReaction, ModelReaction.reaction_id == Reaction.id)
+                 .join(Model, Model.id == ModelReaction.model_id)
+                 .outerjoin(Genome, Genome.id == Model.genome_id)
+                 .filter(Model.bigg_id == model_bigg_id)
+                 .order_by(direction_fn(func.lower(sort_column)))
+                 .limit(size) 
+                 .offset(offset))
+    return [{'bigg_id': x[0], 'name': x[1], 'model_bigg_id': x[2], 'organism': x[3]} for x in result_db]
+
+def get_metabolites_pager(page, size, sort_col_index, sort_direction, model_bigg_id, session):
+    page = int(page); size = int(size)
+    offset = page * size
+    if sort_direction == 'descending':
+        direction_fn = desc
+    elif sort_direction == 'ascending':
+        direction_fn = asc
+    else:
+        raise Exception('Bad sort direction %s' % sort_direction)
+
+    try:
+        sort_column = [Metabolite.bigg_id, Metabolite.name][sort_col_index]
+    except IndexError:
+        sort_column = Metabolite.bigg_id
+    result_db = (session
+                 .query(Metabolite.bigg_id, Metabolite.name, Model.bigg_id, Genome.organism, Compartment.bigg_id)
+                 .join(CompartmentalizedComponent)
+                 .join(ModelCompartmentalizedComponent)
+                 .join(Model)
+                 .outerjoin(Genome, Genome.id == Model.genome_id)
+                 .filter(CompartmentalizedComponent.compartment_id == Compartment.id)
+                 .filter(Model.bigg_id == model_bigg_id)
+                 .order_by(direction_fn(func.lower(sort_column)))
+                 .limit(size) 
+                 .offset(offset))
+    return [{'bigg_id': x[0], 'name': x[1], 'model_bigg_id': x[2], 'organism': x[3], 'compartment': x[4]} for x in result_db]
+
+def get_metabolites_count(model_bigg_id, session):
+    return (session.query(Metabolite)
+                    .join(CompartmentalizedComponent)
+                    .join(ModelCompartmentalizedComponent)
+                    .join(Model)
+                    .filter(Model.bigg_id == model_bigg_id)
+                    .count())
+
+def get_genes_pager(page, size, sort_col_index, sort_direction, model_bigg_id, session):
+    page = int(page); size = int(size)
+    offset = page * size
+    if sort_direction == 'descending':
+        direction_fn = desc
+    elif sort_direction == 'ascending':
+        direction_fn = asc
+    else:
+        raise Exception('Bad sort direction %s' % sort_direction)
+
+    try:
+        sort_column = [Gene.bigg_id, Gene.name][sort_col_index]
+    except IndexError:
+        sort_column = Gene.bigg_id
+    result_db = (session
+                 .query(Gene.bigg_id, 
+                        Gene.name, 
+                        Model.bigg_id, 
+                        Genome.organism)
+                 .join(ModelGene)
+                 .join(Model)
+                 .outerjoin(Genome, Genome.id == Model.genome_id)
+                 .filter(Model.bigg_id == model_bigg_id)
+                 .order_by(direction_fn(func.lower(sort_column)))
+                 .limit(size) 
+                 .offset(offset))
+    return [{'bigg_id': x[0], 'name': x[1], 'model_bigg_id': x[2], 'organism': x[3]} for x in result_db]
+
+def get_genes_count(model_bigg_id, session):
+    return (session.query(Gene)
+            .join(ModelGene)
+            .join(Model)
+            .filter(Model.bigg_id == model_bigg_id)
+            .count())
+
 def get_reaction_and_models(reaction_bigg_id, session):
     result_db = (session
                  .query(Reaction.bigg_id,
@@ -47,7 +248,8 @@ def get_reaction_and_models(reaction_bigg_id, session):
             'pseudoreaction': result_db[0][2],
             'database_links': db_link_results,
             'metabolites': metabolite_db,
-            'models_containing_reaction': [{'bigg_id': x[3], 'organism': x[4]}
+            'models_containing_reaction': [{'bigg_id': x[3], 'organism': x[4], 'url': 'http://%s:%d/api/%s/models/%s' % \
+                                            (api_host, options.port, api_v, url_escape(x[3], plus=False))} 
                                            for x in result_db]}
     
 def get_reactions_for_model(model_bigg_id, session):
@@ -58,7 +260,8 @@ def get_reactions_for_model(model_bigg_id, session):
                  .outerjoin(Genome, Genome.id == Model.genome_id)
                  .filter(Model.bigg_id == model_bigg_id)
                  .all())
-    return [{'bigg_id': x[0], 'name': x[1], 'organism': x[2]}
+    return [{'bigg_id': x[0], 'name': x[1], 'organism': x[2], 'url': 'http://%s:%d/api/%s/models/%s/reactions/%s' % \
+            (api_host, options.port, api_v, url_escape(model_bigg_id, plus=False), url_escape(x[0], plus=False))}
              for x in result_db]
 
 
@@ -134,7 +337,9 @@ def get_model_list_and_counts(session):
                     'organism': getattr(x[2], 'organism', None),
                     'metabolite_count': x[1].metabolite_count,
                     'reaction_count': x[1].reaction_count,
-                    'gene_count': x[1].gene_count}
+                    'gene_count': x[1].gene_count,
+                    'url': 'http://%s:%d/api/%s/models/%s' % \
+                    (api_host, options.port, api_v, url_escape(x[0].bigg_id, plus=False))}
                    for x in model_db]
     return return_dict
     
@@ -147,7 +352,8 @@ def get_model_list_for_reaction(reaction_bigg_id, session):
               .filter(Reaction.bigg_id == reaction_bigg_id)
               .distinct()
               .all())
-    return [x[0] for x in result]
+    return [{'bigg_id': x[0], 'url': 'http://%s:%d/api/%s/models/%s' % \
+            (api_host, options.port, api_v, url_escape(x[0], plus=False))} for x in result]
 
 
 def get_model_list_for_metabolite(metabolite_bigg_id, session):
@@ -159,7 +365,8 @@ def get_model_list_for_metabolite(metabolite_bigg_id, session):
               .join(Metabolite)
               .filter(Metabolite.bigg_id == metabolite_bigg_id)
               .all())
-    return [{'bigg_id': x[0], 'compartment_bigg_id': x[1]} for x in result]
+    return [{'bigg_id': x[0], 'compartment_bigg_id': x[1], 'url': 'http://%s:%d/api/%s/models/%s' % \
+            (api_host, options.port, api_v, url_escape(x[0], plus=False))} for x in result]
 
 def get_model_list(session):
     model_list = (session
@@ -193,8 +400,6 @@ def get_model_and_counts(model_bigg_id, session):
                    'reference_id': model_db[4],
                    'escher_maps': escher_maps}
     return return_dict
-        
-
 def get_model_json_string(model_bigg_id):
     path = join(root_directory, 'static', 'model_dumps',
                 model_bigg_id + '.json')
@@ -219,7 +424,8 @@ def get_metabolites_for_model(model_bigg_id, session):
                  .filter(Model.bigg_id == model_bigg_id)
                  .all())
     return [{'bigg_id': x[0], 'compartment_bigg_id': x[1], 'model_bigg_id': x[2],
-             'name': x[3], 'organism': x[4]}
+             'name': x[3], 'organism': x[4], 'url': 'http://%s:%d/api/%s/models/%s/metabolites/%s_%s' % \
+            (api_host, options.port, api_v, url_escape(model_bigg_id, plus=False), url_escape(x[0], plus=False), url_escape(x[1], plus=False))}
             for x in result_db]
 
 def get_metabolite_list_for_reaction(reaction_id, session):
@@ -243,7 +449,8 @@ def get_metabolite_list_for_reaction(reaction_id, session):
                  .filter(Reaction.bigg_id == reaction_id)
                  .all())
     return [{'bigg_id': x[0], 'stoichiometry': x[1], 'compartment_bigg_id': x[2],
-             'name': x[3]} for x in result_db]
+             'name': x[3], 'url': ('http://%s:%d/api/%s/models/universal/metabolites/%s' % \
+            (api_host, options.port, api_v, url_escape(x[0], plus=False)))} for x in result_db]
     
 def get_metabolite(met_bigg_id, session):
     result_db = (session
@@ -267,11 +474,13 @@ def get_metabolite(met_bigg_id, session):
             'name': result_db[1],
             'formula': result_db[2],
             'database_links': db_link_results,
-            'compartments_in_models': [{'bigg_id': c[0], 'model_bigg_id': c[1], 'organism': c[2]}
-                                       for c in comp_comp_db]}
+            'compartments_in_models': [{'bigg_id': c[0], 'model_bigg_id': c[1], 'organism': c[2],
+                                        'url': ('http://%s:%d/api/%s/models/%s/metabolites/%s_%s' % \
+                                        (api_host, options.port, api_v, url_escape(c[1], plus=False), url_escape(result_db[0], plus=False),url_escape(c[0], plus=False)))}
+                                       for c in comp_comp_db]
+            }
 
-def get_model_comp_metabolite(met_bigg_id, compartment_bigg_id, model_bigg_id,
-                              session):
+def get_model_comp_metabolite(met_bigg_id, compartment_bigg_id, model_bigg_id, session):
     result_db = (session
                  .query(Metabolite.bigg_id,
                         Metabolite.name,
@@ -310,7 +519,10 @@ def get_model_comp_metabolite(met_bigg_id, compartment_bigg_id, model_bigg_id,
             'model_bigg_id': result_db[3],
             'formula': result_db[4],
             'database_links': db_link_results,
-            'reactions': [{'bigg_id': r[0], 'name': r[1], 'model_bigg_id': r[2]}
+            'reactions': [{'bigg_id': r[0], 'name': r[1], 'model_bigg_id': r[2], 'url': 'http://%s:%d/api/%s/models/%s/reactions/%s' % \
+                        (api_host, options.port, api_v,
+                        url_escape(result_db[3], plus=False),
+                        url_escape(result_db[0], plus=False))}
                           for r in reactions_db],
             'escher_maps': escher_maps,
             'other_models_with_metabolite': model_result}
@@ -324,7 +536,10 @@ def get_gene_list_for_model(model_bigg_id, session):
               .outerjoin(Genome, Genome.id == Model.genome_id)
               .filter(Model.bigg_id == model_bigg_id)
               .all())
-    return [{'bigg_id': x[0], 'name': x[1], 'organism': x[2], 'model_bigg_id': x[3]}
+    return [{'bigg_id': x[0], 'name': x[1], 'organism': x[2], 'model_bigg_id': x[3], 'url': 'http://%s:%d/api/%s/models/%s/genes/%s' % \
+            (api_host, options.port, api_v,
+            url_escape(x[3], plus=False),
+            url_escape(x[0], plus=False))}
              for x in result]
     
 
@@ -375,7 +590,11 @@ def get_model_gene(gene_bigg_id, model_bigg_id, session):
                    .filter(Gene.bigg_id == gene_bigg_id)
                    .all())
     reaction_results = [{'bigg_id': r[0], 'gene_reaction_rule': r[1],
-                         'name': r[2]} for r in reaction_db]
+                         'name': r[2], 'url': 'http://%s:%d/api/%s/models/%s/reactions/%s' % \
+                         (api_host, options.port, api_v,
+                         url_escape(result_db[5], plus=False),
+                         url_escape(r[0], plus=False))} 
+                         for r in reaction_db]
     synonym_db = (session
                     .query(Synonym.synonym, DataSource.name)
                     .join(DataSource, DataSource.id == Synonym.synonym_data_source_id)
@@ -411,7 +630,8 @@ def get_genome_and_models(session, bioproject_id):
                           .all())
         return {'bioproject_id': genome_db.bioproject_id,
                 'organism': genome_db.organism,
-                'models': [x.bigg_id for x in models_db],
+                'models': [{'model': x.bigg_id, 'url': 'http://%s:%d/api/%s/models/%s' % \
+                (api_host, options.port, api_v, url_escape(x.bigg_id, plus=False))} for x in models_db],
                 'chromosomes': [x.ncbi_id for x in chromosomes_db]}
 
 
@@ -605,6 +825,69 @@ def search_for_genes(query_string, session, limit_models=None):
              'name': _shorten_name(x[2])}
             for x in result_db]
 
+def search_for_genes_pager(query_string, page, size, sort_col_index, sort_direction, session, limit_models=None):
+    page = int(page); size = int(size)
+    offset = page * size
+    if sort_direction == 'descending':
+        direction_fn = desc
+    elif sort_direction == 'ascending':
+        direction_fn = asc
+    else:
+        raise Exception('Bad sort direction %s' % sort_direction)
+
+    try:
+        sort_column = [Gene.bigg_id, Gene.name][sort_col_index]
+    except IndexError:
+        sort_column = Gene.bigg_id
+    # genes by bigg_id
+    sim_bigg_id = func.similarity(Gene.bigg_id, query_string)
+    sim_name = func.similarity(Gene.name, query_string)
+    qu = (session
+          .query(Gene.bigg_id, Model.bigg_id, Gene.name, sim_bigg_id, Genome.organism)
+          .join(ModelGene)
+          .join(Model)
+          .outerjoin(Genome)
+          .filter(or_(sim_bigg_id >= gene_bigg_id_sim_cutoff,
+                      and_(sim_name >= name_sim_cutoff,
+                           Gene.name != '')))
+          .order_by(direction_fn(func.lower(sort_column))))
+    if limit_models:
+        qu = qu.filter(Model.bigg_id.in_(limit_models))
+    result_db = qu.limit(size).offset(offset)
+    return [{'bigg_id': x[0],
+             'model_bigg_id': x[1],
+             'organism': x[4],
+             'name': _shorten_name(x[2])}
+            for x in result_db]
+
+def search_for_universal_reactions_pager(query_string, page, size, sort_col_index, sort_direction, session):
+    page = int(page); size = int(size)
+    offset = page * size
+    if sort_direction == 'descending':
+        direction_fn = desc
+    elif sort_direction == 'ascending':
+        direction_fn = asc
+    else:
+        raise Exception('Bad sort direction %s' % sort_direction)
+
+    try:
+        sort_column = [Reaction.bigg_id, Reaction.name][sort_col_index]
+    except IndexError:
+        sort_column = Reaction.bigg_id
+    # reactions by bigg_id
+    sim_bigg_id = func.similarity(Reaction.bigg_id, query_string)
+    sim_name = func.similarity(Reaction.name, query_string)
+    result_db = (session
+                 .query(Reaction.bigg_id, Reaction.name)
+                 .filter(or_(sim_bigg_id >= bigg_id_sim_cutoff,
+                            and_(sim_name >= name_sim_cutoff,
+                                 Reaction.name != '')))
+                 .order_by(direction_fn(func.lower(sort_column)))
+                 .limit(size)
+                 .offset(offset))
+    return [{'bigg_id': x[0], 'model_bigg_id': 'universal', 'name': _shorten_name(x[1])}
+            for x in result_db]
+
 def search_for_universal_reactions(query_string, session):
     # reactions by bigg_id
     sim_bigg_id = func.similarity(Reaction.bigg_id, query_string)
@@ -638,6 +921,66 @@ def search_for_reactions(query_string, session, limit_models=None):
     return [{'bigg_id': x[0], 'model_bigg_id': x[1], 'organism': x[2], 'name': x[3]}
             for x in result_db]
 
+def search_for_reactions_pager(query_string, page, size, sort_col_index, sort_direction, session, limit_models=None):
+    page = int(page); size = int(size)
+    offset = page * size
+    if sort_direction == 'descending':
+        direction_fn = desc
+    elif sort_direction == 'ascending':
+        direction_fn = asc
+    else:
+        raise Exception('Bad sort direction %s' % sort_direction)
+
+    try:
+        sort_column = [Reaction.bigg_id, Reaction.name][sort_col_index]
+    except IndexError:
+        sort_column = Reaction.bigg_id
+    # reactions by bigg_id
+    sim_bigg_id = func.similarity(Reaction.bigg_id, query_string)
+    sim_name = func.similarity(Reaction.name, query_string)
+    qu = (session
+          .query(Reaction.bigg_id, Model.bigg_id, Genome.organism, Reaction.name)
+          .join(ModelReaction)
+          .join(Model)
+          .outerjoin(Genome)
+          .filter(or_(sim_bigg_id >= bigg_id_sim_cutoff,
+                      and_(sim_name >= name_sim_cutoff,
+                           Reaction.name != '')))
+          .order_by(direction_fn(func.lower(sort_column))))
+    if limit_models:
+        qu = qu.filter(Model.bigg_id.in_(limit_models))
+    result_db = qu.limit(size).offset(offset)
+    return [{'bigg_id': x[0], 'model_bigg_id': x[1], 'organism': x[2], 'name': x[3]}
+            for x in result_db]
+
+def search_for_universal_metabolites_pager(query_string, page, size, sort_col_index, sort_direction, session):
+    page = int(page); size = int(size)
+    offset = page * size
+    if sort_direction == 'descending':
+        direction_fn = desc
+    elif sort_direction == 'ascending':
+        direction_fn = asc
+    else:
+        raise Exception('Bad sort direction %s' % sort_direction)
+
+    try:
+        sort_column = [Metabolite.bigg_id, Metabolite.name][sort_col_index]
+    except IndexError:
+        sort_column = Metabolite.bigg_id
+    # metabolites by bigg_id
+    sim_bigg_id = func.similarity(Metabolite.bigg_id, query_string)
+    sim_name = func.similarity(Metabolite.name, query_string)
+    result_db = (session
+                 .query(Metabolite.bigg_id, Metabolite.name)
+                 .filter(or_(sim_bigg_id >= bigg_id_sim_cutoff,
+                             and_(sim_name >= name_sim_cutoff,
+                                  Metabolite.name != '')))
+                 .order_by(direction_fn(func.lower(sort_column)))
+                 .limit(size) 
+                 .offset(offset))
+    return [{'bigg_id': x[0], 'model_bigg_id': 'universal', 'name': _shorten_name(x[1]), 'organism': '-'}
+            for x in result_db]
+
 def search_for_universal_metabolites(query_string, session):
     # metabolites by bigg_id
     sim_bigg_id = func.similarity(Metabolite.bigg_id, query_string)
@@ -649,7 +992,7 @@ def search_for_universal_metabolites(query_string, session):
                                   Metabolite.name != '')))
                  .order_by(sim_bigg_id.desc(), sim_name.desc())
                  .all())
-    return [{'bigg_id': x[0], 'model_bigg_id': 'universal', 'name': _shorten_name(x[1])}
+    return [{'bigg_id': x[0], 'model_bigg_id': 'universal', 'name': _shorten_name(x[1]), 'organism': '-'}
             for x in result_db]
 
 def search_for_metabolites_by_external_id(query_string, source, session):
@@ -674,7 +1017,7 @@ def search_for_metabolites_by_external_id(query_string, source, session):
     return [{'bigg_id': x[0], 'compartment_bigg_id': x[1], 'model_bigg_id': x[2], 'organism': x[3]}
             for x in result_db]
 
-def search_for_metabolites(query_string, session, limit_models=None,
+def search_for_metabolites_pager(query_string, page, size, sort_col_index, sort_direction, session, limit_models=None,
                            strict=False):
     """Search for metabolites.
 
@@ -690,6 +1033,66 @@ def search_for_metabolites(query_string, session, limit_models=None,
     strict: if True, then only look for exact matches to the BiGG ID, with the
     compartment.
 
+    """
+
+    page = int(page); size = int(size)
+    offset = page * size
+    if sort_direction == 'descending':
+        direction_fn = desc
+    elif sort_direction == 'ascending':
+        direction_fn = asc
+    else:
+        raise Exception('Bad sort direction %s' % sort_direction)
+
+    try:
+        sort_column = [Metabolite.bigg_id, Metabolite.name][sort_col_index]
+    except IndexError:
+        sort_column = Metabolite.bigg_id
+    # metabolites by bigg_id
+    sim_bigg_id = func.similarity(Metabolite.bigg_id, query_string)
+    sim_name = func.similarity(Metabolite.name, query_string)
+    qu = (session
+          .query(Metabolite.bigg_id, Compartment.bigg_id, Model.bigg_id,
+                 Genome.organism, Metabolite.name)
+          .join(CompartmentalizedComponent,
+                CompartmentalizedComponent.component_id == Metabolite.id)
+          .join(Compartment,
+                Compartment.id == CompartmentalizedComponent.compartment_id)
+          .join(ModelCompartmentalizedComponent,
+                ModelCompartmentalizedComponent.compartmentalized_component_id == CompartmentalizedComponent.id)
+          .join(Model, Model.id == ModelCompartmentalizedComponent.model_id)
+          .outerjoin(Genome))
+    if strict:
+        try:
+            metabolite_bigg_id, compartment_bigg_id = parse.split_compartment(query_string)
+        except Exception:
+            return [] 
+        qu = (qu
+              .filter(Metabolite.bigg_id == metabolite_bigg_id)
+              .filter(Compartment.bigg_id == compartment_bigg_id))
+    else:
+        qu = (qu
+              .filter(or_(sim_bigg_id >= bigg_id_sim_cutoff,
+                          and_(sim_name >= name_sim_cutoff,
+                               Metabolite.name != '')))
+              .order_by(direction_fn(func.lower(sort_column))))
+    if limit_models:
+        qu = qu.filter(Model.bigg_id.in_(limit_models))
+    result_db = qu.limit(size).offset(offset)
+    return [{'bigg_id': x[0], 'compartment_bigg_id': x[1], 'model_bigg_id': x[2],
+             'organism': x[3], 'name': x[4]}
+            for x in result_db]
+
+def search_for_metabolites(query_string, session, limit_models=None,
+                           strict=False):
+    """Search for metabolites.
+    Arguments
+    ---------
+    query_string: search string
+    session: the session
+    limit_models: search for results in only this array of model BiGG IDs
+    strict: if True, then only look for exact matches to the BiGG ID, with the
+    compartment.
     """
     # metabolites by bigg_id
     sim_bigg_id = func.similarity(Metabolite.bigg_id, query_string)
@@ -724,6 +1127,36 @@ def search_for_metabolites(query_string, session, limit_models=None,
     result_db = qu.all()
     return [{'bigg_id': x[0], 'compartment_bigg_id': x[1], 'model_bigg_id': x[2],
              'organism': x[3], 'name': x[4]}
+            for x in result_db]
+
+
+def search_for_models_pager(query_string, page, size, sort_col_index, sort_direction, session):
+    page = int(page); size = int(size)
+    offset = page * size
+    if sort_direction == 'descending':
+        direction_fn = desc
+    elif sort_direction == 'ascending':
+        direction_fn = asc
+    else:
+        raise Exception('Bad sort direction %s' % sort_direction)
+
+    try:
+        sort_column = [Model.bigg_id, Genome.organism, ModelCount.metabolite_count, ModelCount.reaction_count, ModelCount.gene_count][sort_col_index]
+    except IndexError:
+        sort_column = Model.bigg_id
+    # models by bigg_id
+    sim_bigg_id = func.similarity(Model.bigg_id, query_string)
+    sim_organism = func.similarity(Genome.organism, query_string)
+    result_db = (session
+                 .query(Model.bigg_id, ModelCount, Genome.organism)
+                 .join(ModelCount)
+                 .outerjoin(Genome)
+                 .filter(or_(sim_bigg_id >= bigg_id_sim_cutoff, sim_organism >= organism_sim_cutoff))
+                 .order_by(direction_fn(func.lower(sort_column)))
+                 .limit(size)
+                 .offset(offset))
+    return [{'bigg_id': x[0], 'organism': x[2], 'metabolite_count': x[1].metabolite_count,
+             'reaction_count': x[1].reaction_count, 'gene_count': x[1].gene_count}
             for x in result_db]
 
 def search_for_models(query_string, session):

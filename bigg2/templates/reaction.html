@@ -104,10 +104,10 @@
       <div class="well">
         <h4>{{bigg_id}} in other models</h4>
         <ul class="list-unstyled">
-          {% for model_bigg_id in other_models_with_reaction %}
+          {% for model in other_models_with_reaction %}
             <li>
-	          <a href="/models/{{model_bigg_id}}/reactions/{{bigg_id}}">
-		        {{model_bigg_id}}
+	          <a href="/models/{{model['bigg_id']}}/reactions/{{bigg_id}}">
+		        {{model['bigg_id']}}
 	          </a>
             </li>
           {% endfor %}
