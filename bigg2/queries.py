@@ -1,6 +1,3 @@
-from ome.models import *
-from ome.base import Publication, PublicationModel
-from ome.loading.model_loading import parse
 from tornado.options import options
 from tornado.escape import url_escape
 from sqlalchemy import func
@@ -8,9 +5,13 @@ from sqlalchemy import desc, asc, func, or_, and_
 from collections import defaultdict
 from os.path import abspath, dirname, join
 
+from bigg2.version import api_host, api_version
+from ome.models import *
+from ome.base import Publication, PublicationModel
+from ome.loading.model_loading import parse
+
 root_directory = abspath(dirname(__file__))
-api_host = 'bigg.ucsd.edu'
-api_v = 'v2'
+
 class NotFoundError(Exception):
     pass
 
@@ -21,6 +22,13 @@ def _shorten_name(name, l=100):
         return name[:l] + '...'
     else:
         return name
+
+def _add_host(format_string, *args):
+    """Add the host and the port, and escape the arguments."""
+    formatted_string = format_string.format(*[url_escape(x, plus=False)
+                                              for x in args])
+    return 'http://{}/api/{}/{}'.format(api_host, api_version,
+                                        formatted_string.lstrip('/'))
 
 # Reactions
 def get_universal_reactions(session):
@@ -248,8 +256,8 @@ def get_reaction_and_models(reaction_bigg_id, session):
             'pseudoreaction': result_db[0][2],
             'database_links': db_link_results,
             'metabolites': metabolite_db,
-            'models_containing_reaction': [{'bigg_id': x[3], 'organism': x[4], 'url': 'http://%s:%d/api/%s/models/%s' % \
-                                            (api_host, options.port, api_v, url_escape(x[3], plus=False))} 
+            'models_containing_reaction': [{'bigg_id': x[3], 'organism': x[4],
+                                            'url': _add_host('/models/{}', x[3])}
                                            for x in result_db]}
     
 def get_reactions_for_model(model_bigg_id, session):
@@ -260,8 +268,8 @@ def get_reactions_for_model(model_bigg_id, session):
                  .outerjoin(Genome, Genome.id == Model.genome_id)
                  .filter(Model.bigg_id == model_bigg_id)
                  .all())
-    return [{'bigg_id': x[0], 'name': x[1], 'organism': x[2], 'url': 'http://%s:%d/api/%s/models/%s/reactions/%s' % \
-            (api_host, options.port, api_v, url_escape(model_bigg_id, plus=False), url_escape(x[0], plus=False))}
+    return [{'bigg_id': x[0], 'name': x[1], 'organism': x[2],
+             'url': _add_host('/models/{}/reactions/{}', model_bigg_id, x[0])}
              for x in result_db]
 
 
@@ -338,8 +346,7 @@ def get_model_list_and_counts(session):
                     'metabolite_count': x[1].metabolite_count,
                     'reaction_count': x[1].reaction_count,
                     'gene_count': x[1].gene_count,
-                    'url': 'http://%s:%d/api/%s/models/%s' % \
-                    (api_host, options.port, api_v, url_escape(x[0].bigg_id, plus=False))}
+                    'url': _add_host('/models/{}', x[0].bigg_id)}
                    for x in model_db]
     return return_dict
     
@@ -352,8 +359,8 @@ def get_model_list_for_reaction(reaction_bigg_id, session):
               .filter(Reaction.bigg_id == reaction_bigg_id)
               .distinct()
               .all())
-    return [{'bigg_id': x[0], 'url': 'http://%s:%d/api/%s/models/%s' % \
-            (api_host, options.port, api_v, url_escape(x[0], plus=False))} for x in result]
+    return [{'bigg_id': x[0], 'url': _add_host('/models/{}', x[0])}
+            for x in result]
 
 
 def get_model_list_for_metabolite(metabolite_bigg_id, session):
@@ -365,8 +372,9 @@ def get_model_list_for_metabolite(metabolite_bigg_id, session):
               .join(Metabolite)
               .filter(Metabolite.bigg_id == metabolite_bigg_id)
               .all())
-    return [{'bigg_id': x[0], 'compartment_bigg_id': x[1], 'url': 'http://%s:%d/api/%s/models/%s' % \
-            (api_host, options.port, api_v, url_escape(x[0], plus=False))} for x in result]
+    return [{'bigg_id': x[0], 'compartment_bigg_id': x[1],
+             'url': _add_host('/models/{}', x[0])}
+            for x in result]
 
 def get_model_list(session):
     model_list = (session
@@ -424,8 +432,8 @@ def get_metabolites_for_model(model_bigg_id, session):
                  .filter(Model.bigg_id == model_bigg_id)
                  .all())
     return [{'bigg_id': x[0], 'compartment_bigg_id': x[1], 'model_bigg_id': x[2],
-             'name': x[3], 'organism': x[4], 'url': 'http://%s:%d/api/%s/models/%s/metabolites/%s_%s' % \
-            (api_host, options.port, api_v, url_escape(model_bigg_id, plus=False), url_escape(x[0], plus=False), url_escape(x[1], plus=False))}
+             'name': x[3], 'organism': x[4],
+             'url': _add_host('/models/{}/metabolites/{}_{}', model_bigg_id, x[0], x[1])}
             for x in result_db]
 
 def get_metabolite_list_for_reaction(reaction_id, session):
@@ -449,8 +457,8 @@ def get_metabolite_list_for_reaction(reaction_id, session):
                  .filter(Reaction.bigg_id == reaction_id)
                  .all())
     return [{'bigg_id': x[0], 'stoichiometry': x[1], 'compartment_bigg_id': x[2],
-             'name': x[3], 'url': ('http://%s:%d/api/%s/models/universal/metabolites/%s' % \
-            (api_host, options.port, api_v, url_escape(x[0], plus=False)))} for x in result_db]
+             'name': x[3], 'url': _add_host('/models/universal/metabolites/{}', x[0])}
+            for x in result_db]
     
 def get_metabolite(met_bigg_id, session):
     result_db = (session
@@ -474,11 +482,11 @@ def get_metabolite(met_bigg_id, session):
             'name': result_db[1],
             'formula': result_db[2],
             'database_links': db_link_results,
-            'compartments_in_models': [{'bigg_id': c[0], 'model_bigg_id': c[1], 'organism': c[2],
-                                        'url': ('http://%s:%d/api/%s/models/%s/metabolites/%s_%s' % \
-                                        (api_host, options.port, api_v, url_escape(c[1], plus=False), url_escape(result_db[0], plus=False),url_escape(c[0], plus=False)))}
-                                       for c in comp_comp_db]
-            }
+            'compartments_in_models': [
+                {'bigg_id': c[0], 'model_bigg_id': c[1], 'organism': c[2],
+                 'url': _add_host('/models/{}/metabolites/{}_{}', c[1], result_db[0], c[0])}
+                for c in comp_comp_db
+            ]}
 
 def get_model_comp_metabolite(met_bigg_id, compartment_bigg_id, model_bigg_id, session):
     result_db = (session
@@ -519,10 +527,8 @@ def get_model_comp_metabolite(met_bigg_id, compartment_bigg_id, model_bigg_id, s
             'model_bigg_id': result_db[3],
             'formula': result_db[4],
             'database_links': db_link_results,
-            'reactions': [{'bigg_id': r[0], 'name': r[1], 'model_bigg_id': r[2], 'url': 'http://%s:%d/api/%s/models/%s/reactions/%s' % \
-                        (api_host, options.port, api_v,
-                        url_escape(result_db[3], plus=False),
-                        url_escape(result_db[0], plus=False))}
+            'reactions': [{'bigg_id': r[0], 'name': r[1], 'model_bigg_id': r[2],
+                           'url': _add_host('/models/{}/reactions/{}', result_db[3], r[0])}
                           for r in reactions_db],
             'escher_maps': escher_maps,
             'other_models_with_metabolite': model_result}
@@ -536,10 +542,8 @@ def get_gene_list_for_model(model_bigg_id, session):
               .outerjoin(Genome, Genome.id == Model.genome_id)
               .filter(Model.bigg_id == model_bigg_id)
               .all())
-    return [{'bigg_id': x[0], 'name': x[1], 'organism': x[2], 'model_bigg_id': x[3], 'url': 'http://%s:%d/api/%s/models/%s/genes/%s' % \
-            (api_host, options.port, api_v,
-            url_escape(x[3], plus=False),
-            url_escape(x[0], plus=False))}
+    return [{'bigg_id': x[0], 'name': x[1], 'organism': x[2], 'model_bigg_id': x[3],
+             'url': _add_host('/models/{}/genes/{}', x[3], x[0])}
              for x in result]
     
 
@@ -590,10 +594,7 @@ def get_model_gene(gene_bigg_id, model_bigg_id, session):
                    .filter(Gene.bigg_id == gene_bigg_id)
                    .all())
     reaction_results = [{'bigg_id': r[0], 'gene_reaction_rule': r[1],
-                         'name': r[2], 'url': 'http://%s:%d/api/%s/models/%s/reactions/%s' % \
-                         (api_host, options.port, api_v,
-                         url_escape(result_db[5], plus=False),
-                         url_escape(r[0], plus=False))} 
+                         'name': r[2], 'url': _add_host('/models/{}/reactions/{}', result_db[5], r[0])}
                          for r in reaction_db]
     synonym_db = (session
                     .query(Synonym.synonym, DataSource.name)
@@ -630,8 +631,8 @@ def get_genome_and_models(session, bioproject_id):
                           .all())
         return {'bioproject_id': genome_db.bioproject_id,
                 'organism': genome_db.organism,
-                'models': [{'model': x.bigg_id, 'url': 'http://%s:%d/api/%s/models/%s' % \
-                (api_host, options.port, api_v, url_escape(x.bigg_id, plus=False))} for x in models_db],
+                'models': [{'model': x.bigg_id, 'url': _add_host('/models/{}', x.bigg_id)}
+                            for x in models_db],
                 'chromosomes': [x.ncbi_id for x in chromosomes_db]}
 
 

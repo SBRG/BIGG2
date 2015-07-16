@@ -41,6 +41,7 @@ def test_get_reactions_for_model():
     result = get_reactions_for_model('iAPECO1_1312', session)
     assert len(result) > 5
     assert 'ADA' in [x['bigg_id'] for x in result]
+    assert 'url' in results[0]
     session.close()
     
 
@@ -70,6 +71,7 @@ def test_get_model_list_and_counts():
     assert type(result[0]['metabolite_count']) is int
     assert type(result[0]['reaction_count']) is int
     assert type(result[0]['gene_count']) is int
+    assert 'url' in results[0]
     session.close()
 
 def test_get_model_and_counts():
@@ -134,6 +136,7 @@ def test_get_metabolites_for_model():
     results = get_metabolites_for_model('iAPECO1_1312', session)
     assert 'akg' in [x['bigg_id'] for x in results]
     assert 'c' in [x['compartment_bigg_id'] for x in results]
+    assert 'url' in results[0]
     session.close()
 
 # genes

@@ -19,6 +19,7 @@ import os
 
 from bigg2 import queries
 from bigg2.queries import NotFoundError
+from bigg2.version import api_host, api_version
 from ome import settings
 from ome.models import (Model, Component, Reaction, Compartment, Metabolite,
                         CompartmentalizedComponent, ModelReaction,
@@ -40,10 +41,6 @@ env = Environment(loader=PackageLoader('bigg2', 'templates'),
 # root directory
 directory = abspath(dirname(__file__))
 
-# api version
-api_v = 'v2'
-api_host = 'bigg.ucsd.edu'
-
 # make a tutorial on how to make a api request using curl
 # http://www.restapitutorial.com/
 
@@ -56,60 +53,60 @@ def get_application():
         # 
         # Universal
         #
-        (r'/api/%s/(?:models/)?universal/reactions/?$' % api_v, UniversalReactionListHandler),
+        (r'/api/%s/(?:models/)?universal/reactions/?$' % api_version, UniversalReactionListHandler),
         (r'/(?:models/)?universal/reactions/?$', UniversalReactionListDisplayHandler),
         # 
-        (r'/api/%s/(?:models/)?universal/reactions/([^/]+)/?$' % api_v, UniversalReactionHandler),
+        (r'/api/%s/(?:models/)?universal/reactions/([^/]+)/?$' % api_version, UniversalReactionHandler),
         (r'/(?:models/)?universal/reactions/([^/]+)/?$', UniversalReactionDisplayHandler),
         #
-        (r'/api/%s/(?:models/)?universal/metabolites/?$' % api_v, UniversalMetaboliteListHandler),
+        (r'/api/%s/(?:models/)?universal/metabolites/?$' % api_version, UniversalMetaboliteListHandler),
         (r'/(?:models/)?universal/metabolites/?$', UniversalMetaboliteListDisplayHandler),
         # 
-        (r'/api/%s/(?:models/)?universal/metabolites/([^/]+)/?$' % api_v, UniversalMetaboliteHandler),
+        (r'/api/%s/(?:models/)?universal/metabolites/([^/]+)/?$' % api_version, UniversalMetaboliteHandler),
         (r'/(?:models/)?universal/metabolites/([^/]+)/?$', UniversalMetaboliteDisplayHandler),
         # 
-        (r'/api/%s/compartments/?$' % api_v, CompartmentListHandler),
+        (r'/api/%s/compartments/?$' % api_version, CompartmentListHandler),
         (r'/compartments/?$', CompartmentListDisplayHandler),
         # 
-        (r'/api/%s/compartments/([^/]+)/?$' % api_v, CompartmentHandler),
+        (r'/api/%s/compartments/([^/]+)/?$' % api_version, CompartmentHandler),
         (r'/compartments/([^/]+)/?$', CompartmentDisplayHandler),
         #
-        (r'/api/%s/genomes/?$' % api_v, GenomeListHandler),
+        (r'/api/%s/genomes/?$' % api_version, GenomeListHandler),
         (r'/genomes/?$', GenomeListDisplayHandler),
         # 
-        (r'/api/%s/genomes/([^/]+)/?$' % api_v, GenomeHandler),
+        (r'/api/%s/genomes/([^/]+)/?$' % api_version, GenomeHandler),
         (r'/genomes/([^/]+)/?$', GenomeDisplayHandler),
         #
         # By model
         #
-        (r'/api/%s/models/?$' % api_v, ModelListHandler),
+        (r'/api/%s/models/?$' % api_version, ModelListHandler),
         (r'/models/?$', ModelsListDisplayHandler),
         #
-        (r'/api/%s/models/([^/]+)/?$' % api_v, ModelHandler),
+        (r'/api/%s/models/([^/]+)/?$' % api_version, ModelHandler),
         (r'/models/([^/]+)/?$', ModelDisplayHandler),
         # 
-        (r'/(?:api/%s/)?models/([^/]+)/download/?$' % api_v, ModelDownloadHandler),
+        (r'/(?:api/%s/)?models/([^/]+)/download/?$' % api_version, ModelDownloadHandler),
         #
-        (r'/api/%s/models/([^/]+)/reactions/([^/]+)/?$' % api_v, ReactionHandler),
+        (r'/api/%s/models/([^/]+)/reactions/([^/]+)/?$' % api_version, ReactionHandler),
         (r'/models/([^/]+)/reactions/([^/]+)/?$', ReactionDisplayHandler),
         # 
-        (r'/api/%s/models/([^/]+)/reactions/?$' % api_v, ReactionListHandler),
+        (r'/api/%s/models/([^/]+)/reactions/?$' % api_version, ReactionListHandler),
         (r'/models/([^/]+)/reactions/?$', ReactionListDisplayHandler),
         #
-        (r'/api/%s/models/([^/]+)/metabolites/?$' % api_v, MetaboliteListHandler),
+        (r'/api/%s/models/([^/]+)/metabolites/?$' % api_version, MetaboliteListHandler),
         (r'/models/([^/]+)/metabolites/?$', MetabolitesListDisplayHandler),
         #
-        (r'/api/%s/models/([^/]+)/metabolites/([^/]+)/?$' % api_v, MetaboliteHandler),
+        (r'/api/%s/models/([^/]+)/metabolites/([^/]+)/?$' % api_version, MetaboliteHandler),
         (r'/models/([^/]+)/metabolites/([^/]+)/?$', MetaboliteDisplayHandler),
         #
-        (r'/api/%s/models/([^/]+)/genes/([^/]+)/?$' % api_v, GeneHandler),
+        (r'/api/%s/models/([^/]+)/genes/([^/]+)/?$' % api_version, GeneHandler),
         (r'/models/([^/]+)/genes/([^/]+)/?$', GeneDisplayHandler),
         #
-        (r'/api/%s/models/([^/]+)/genes/?$' % api_v, GeneListHandler),
+        (r'/api/%s/models/([^/]+)/genes/?$' % api_version, GeneListHandler),
         (r'/models/([^/]+)/genes/?$', GeneListDisplayHandler),
         # 
         # Search
-        (r'/api/%s/search$' % api_v, SearchHandler),
+        (r'/api/%s/search$' % api_version, SearchHandler),
         (r'/search$', SearchDisplayHandler),
         (r'/advanced_search$', AdvancedSearchHandler),
         (r'/advanced_search_external_id_results$', AdvancedSearchExternalIDHandler),
@@ -221,7 +218,7 @@ class UniversalReactionListDisplayHandler(BaseHandler):
     def get(self):
         template = env.get_template("list_display.html")
         http_client = AsyncHTTPClient()
-        url_request = 'http://localhost:%d/api/%s/universal/reactions' % (options.port, api_v)
+        url_request = 'http://localhost:%d/api/%s/universal/reactions' % (options.port, api_version)
         request = tornado.httpclient.HTTPRequest(url=url_request,
                                                  connect_timeout=20.0,
                                                  request_timeout=20.0)
@@ -258,7 +255,7 @@ class UniversalReactionDisplayHandler(BaseHandler):
         template = env.get_template("universal_reaction.html")
         http_client = AsyncHTTPClient()
         url_request = ('http://localhost:%d/api/%s/models/universal/reactions/%s' %
-                       (options.port, api_v, url_escape(reaction_bigg_id, plus=False)))
+                       (options.port, api_version, url_escape(reaction_bigg_id, plus=False)))
         request = tornado.httpclient.HTTPRequest(url=url_request,
                                                  connect_timeout=20.0,
                                                  request_timeout=20.0)
@@ -322,7 +319,7 @@ class UniversalMetaboliteListDisplayHandler(BaseHandler):
         template = env.get_template("list_display.html")
         http_client = AsyncHTTPClient()
         url_request = 'http://localhost:%d/api/%s/universal/metabolites' % \
-                      (options.port, api_v)
+                      (options.port, api_version)
         request = tornado.httpclient.HTTPRequest(url=url_request,
                                                  connect_timeout=20.0,
                                                  request_timeout=20.0)
@@ -357,7 +354,7 @@ class UniversalMetaboliteDisplayHandler(BaseHandler):
         template = env.get_template("universal_metabolite.html")
         http_client = AsyncHTTPClient()
         url_request = 'http://localhost:%d/api/%s/models/universal/metabolites/%s' % \
-                      (options.port, api_v, url_escape(met_bigg_id, plus=False))
+                      (options.port, api_version, url_escape(met_bigg_id, plus=False))
         response = yield gen.Task(http_client.fetch, url_request)
         if response.error:
             raise HTTPError(404)
@@ -417,7 +414,7 @@ class ReactionListDisplayHandler(BaseHandler):
         template = env.get_template("list_display.html")
         http_client = AsyncHTTPClient()
         url_request = ('http://localhost:%d/api/%s/models/%s/reactions' %
-                       (options.port, api_v, url_escape(model_bigg_id, plus=False)))
+                       (options.port, api_version, url_escape(model_bigg_id, plus=False)))
         request = tornado.httpclient.HTTPRequest(url=url_request,
                                                  connect_timeout=20.0,
                                                  request_timeout=20.0)
@@ -455,7 +452,7 @@ class ReactionDisplayHandler(BaseHandler):
         template = env.get_template("reaction.html")
         http_client = AsyncHTTPClient()
         url_request = 'http://localhost:%d/api/%s/models/%s/reactions/%s' % \
-                      (options.port, api_v,
+                      (options.port, api_version,
                        url_escape(model_bigg_id, plus=False),
                        url_escape(reaction_bigg_id, plus=False))
         request = tornado.httpclient.HTTPRequest(url=url_request,
@@ -493,7 +490,7 @@ class CompartmentListDisplayHandler(BaseHandler):
     def get(self):
         template = env.get_template("compartments.html")
         http_client = AsyncHTTPClient()
-        url_request = 'http://localhost:%d/api/%s/compartments' % (options.port, api_v)
+        url_request = 'http://localhost:%d/api/%s/compartments' % (options.port, api_version)
         request = tornado.httpclient.HTTPRequest(url=url_request,
                                                  connect_timeout=20.0,
                                                  request_timeout=20.0)
@@ -528,7 +525,7 @@ class CompartmentDisplayHandler(BaseHandler):
         template = env.get_template("compartment.html")
         http_client = AsyncHTTPClient()
         url_request = 'http://localhost:%d/api/%s/compartments/%s' % \
-                      (options.port, api_v,
+                      (options.port, api_version,
                        url_escape(compartment_bigg_id, plus=False))
         request = tornado.httpclient.HTTPRequest(url=url_request,
                                                  connect_timeout=20.0,
@@ -561,7 +558,7 @@ class GenomeListDisplayHandler(BaseHandler):
     def get(self):
         template = env.get_template("genomes.html")
         http_client = AsyncHTTPClient()
-        url_request = 'http://localhost:%d/api/%s/genomes' % (options.port, api_v)
+        url_request = 'http://localhost:%d/api/%s/genomes' % (options.port, api_version)
         request = tornado.httpclient.HTTPRequest(url=url_request,
                                                  connect_timeout=20.0,
                                                  request_timeout=20.0)
@@ -592,7 +589,7 @@ class GenomeDisplayHandler(BaseHandler):
         template = env.get_template("genome.html")
         http_client = AsyncHTTPClient()
         url_request = 'http://localhost:%d/api/%s/genomes/%s' % \
-                      (options.port, api_v, url_escape(bioproject_id, plus=False))
+                      (options.port, api_version, url_escape(bioproject_id, plus=False))
         request = tornado.httpclient.HTTPRequest(url=url_request,
                                                  connect_timeout=20.0,
                                                  request_timeout=20.0)
@@ -651,7 +648,7 @@ class ModelsListDisplayHandler(BaseHandler):
     def get(self):
         template = env.get_template("list_display.html")
         http_client = AsyncHTTPClient()
-        url_request = 'http://localhost:%d/api/%s/models' % (options.port, api_v)
+        url_request = 'http://localhost:%d/api/%s/models' % (options.port, api_version)
         request = tornado.httpclient.HTTPRequest(url=url_request,
                                                  connect_timeout=20.0,
                                                  request_timeout=20.0)
@@ -691,7 +688,7 @@ class ModelDisplayHandler(BaseHandler):
         template = env.get_template("model.html")
         http_client = AsyncHTTPClient()
         url_request = 'http://localhost:%d/api/%s/models/%s' % \
-                      (options.port, api_v, url_escape(model_bigg_id, plus=False))
+                      (options.port, api_version, url_escape(model_bigg_id, plus=False))
         print url_request
         request = tornado.httpclient.HTTPRequest(url=url_request,
                                                  connect_timeout=20.0,
@@ -751,7 +748,7 @@ class MetabolitesListDisplayHandler(BaseHandler):
         template = env.get_template("list_display.html")
         http_client = AsyncHTTPClient()
         url_request = 'http://localhost:%d/api/%s/models/%s/metabolites' % \
-                      (options.port, api_v, url_escape(model_bigg_id, plus=False))
+                      (options.port, api_version, url_escape(model_bigg_id, plus=False))
         request = tornado.httpclient.HTTPRequest(url=url_request,
                                                  connect_timeout=20.0,
                                                  request_timeout=20.0)
@@ -784,7 +781,7 @@ class MetaboliteDisplayHandler(BaseHandler):
         template = env.get_template("metabolite.html")
         http_client = AsyncHTTPClient()
         url_request = 'http://localhost:%d/api/%s/models/%s/metabolites/%s' % \
-                      (options.port, api_v,
+                      (options.port, api_version,
                        url_escape(model_id, plus=False),
                        url_escape(met_bigg_id, plus=False))
         request = tornado.httpclient.HTTPRequest(url=url_request,
@@ -845,7 +842,7 @@ class GeneListDisplayHandler(BaseHandler):
         template = env.get_template("list_display.html")
         http_client = AsyncHTTPClient()
         url_request = 'http://localhost:%d/api/%s/models/%s/genes' % \
-                      (options.port, api_v, url_escape(model_bigg_id, plus=False))
+                      (options.port, api_version, url_escape(model_bigg_id, plus=False))
         request = tornado.httpclient.HTTPRequest(url=url_request,
                                                  connect_timeout=20.0,
                                                  request_timeout=20.0)
@@ -878,7 +875,7 @@ class GeneDisplayHandler(BaseHandler):
         template = env.get_template("gene.html")
         http_client = AsyncHTTPClient()
         url_request = 'http://localhost:%d/api/%s/models/%s/genes/%s' % \
-                      (options.port, api_v,
+                      (options.port, api_version,
                        url_escape(model_bigg_id, plus=False),
                        url_escape(gene_bigg_id, plus=False))
         request = tornado.httpclient.HTTPRequest(url=url_request,
@@ -1007,7 +1004,7 @@ class SearchDisplayHandler(BaseHandler):
         http_client = AsyncHTTPClient()
         query_url = url_escape(self.get_argument("query"), plus=True)
         url_request = ('http://localhost:%d/api/%s/search?query=%s' %
-                       (options.port, api_v, query_url))
+                       (options.port, api_version, query_url))
         request = tornado.httpclient.HTTPRequest(url=url_request,
                                                  connect_timeout=20.0,
                                                  request_timeout=20.0)
